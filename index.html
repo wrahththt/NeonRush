@@ -1,0 +1,3152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NEON RUSH</title>
+
+<style>
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}
+
+html,body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#020208;
+    font-family:Arial,sans-serif;
+}
+
+canvas{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+}
+
+#menu,
+#gameOver,
+#win{
+    position:fixed;
+    inset:0;
+    z-index:20;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:rgba(2,2,10,.58);
+    backdrop-filter:blur(4px);
+}
+
+#gameOver,
+#win{
+    display:none;
+}
+
+.logo{
+    font-size:clamp(50px,8vw,100px);
+    font-weight:900;
+    letter-spacing:8px;
+    color:white;
+    text-shadow:
+        0 0 10px #00eaff,
+        0 0 30px #00eaff,
+        0 0 70px #8b00ff;
+}
+
+.subtitle{
+    margin:10px 0 40px;
+    color:#888;
+    letter-spacing:5px;
+    font-size:13px;
+}
+
+.buttons{
+    display:flex;
+    gap:15px;
+}
+
+button{
+    min-width:150px;
+    padding:15px 25px;
+    border-radius:8px;
+    border:2px solid #00eaff;
+    background:rgba(0,234,255,.07);
+    color:white;
+    font-size:15px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:.12s;
+}
+
+button:hover{
+    transform:scale(1.05);
+    background:rgba(0,234,255,.18);
+    box-shadow:0 0 25px #00eaff;
+}
+
+.easy{
+    border-color:#00ff9d;
+}
+
+.normal{
+    border-color:#00eaff;
+}
+
+.hard{
+    border-color:#ff2997;
+}
+
+.info{
+    position:absolute;
+    bottom:25px;
+    color:#555;
+}
+
+#hud{
+    position:fixed;
+    z-index:10;
+    top:15px;
+    left:50%;
+    transform:translateX(-50%);
+    width:min(750px,80vw);
+    display:none;
+}
+
+#progressBack{
+    width:100%;
+    height:8px;
+    background:rgba(0,0,0,.5);
+    border:1px solid rgba(255,255,255,.25);
+    border-radius:20px;
+    overflow:hidden;
+}
+
+#progress{
+    width:0%;
+    height:100%;
+    background:linear-gradient(
+        90deg,
+        #00eaff,
+        #8b00ff,
+        #ff2997
+    );
+}
+
+#score{
+    text-align:center;
+    color:white;
+    font-weight:bold;
+    margin-top:7px;
+    font-size:14px;
+}
+
+#musicButton{
+    position:fixed;
+    top:15px;
+    right:15px;
+    z-index:30;
+    display:none;
+    min-width:0;
+    padding:9px 13px;
+    font-size:12px;
+}
+
+#gameOver h1,
+#win h1{
+    font-size:clamp(55px,8vw,100px);
+    color:white;
+    margin-bottom:20px;
+}
+
+#gameOver h1{
+    text-shadow:
+        0 0 15px #ff2997,
+        0 0 45px #ff2997;
+}
+
+#win h1{
+    text-shadow:
+        0 0 15px #00ff9d,
+        0 0 45px #00eaff;
+}
+
+#gameOver p,
+#win p{
+    color:#aaa;
+    margin-bottom:25px;
+}
+
+@media(max-width:700px){
+    .buttons{
+        flex-direction:column;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="menu">
+
+    <div class="logo">
+        NEON RUSH
+    </div>
+
+    <div class="subtitle">
+        FUTURISTIC RHYTHM RUNNER
+    </div>
+
+    <div class="buttons">
+        <button class="easy" id="easyBtn">
+            FACILE
+        </button>
+
+        <button class="normal" id="normalBtn">
+            NORMAL
+        </button>
+
+        <button class="hard" id="hardBtn">
+            DIFFICILE
+        </button>
+    </div>
+
+    <div class="info">
+        ESPACE / CLIC = SAUT
+    </div>
+
+</div>
+
+
+<div id="hud">
+
+    <div id="progressBack">
+        <div id="progress"></div>
+    </div>
+
+    <div id="score">
+        0%
+    </div>
+
+</div>
+
+
+<button id="musicButton">
+    🔊 MUSIQUE
+</button>
+
+
+<div id="gameOver">
+
+    <h1>CRASH</h1>
+
+    <p>
+        Timing raté.
+    </p>
+
+    <button id="retryBtn">
+        REJOUER
+    </button>
+
+    <button id="menuBtn1">
+        MENU
+    </button>
+
+</div>
+
+
+<div id="win">
+
+    <h1>TERMINÉ</h1>
+
+    <p>
+        Niveau terminé.
+    </p>
+
+    <button id="retryBtn2">
+        REJOUER
+    </button>
+
+    <button id="menuBtn2">
+        MENU
+    </button>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   CANVAS
+========================================================= */
+
+const canvas =
+    document.getElementById("game");
+
+const ctx =
+    canvas.getContext("2d", {
+        alpha:false
+    });
+
+let W =
+    window.innerWidth;
+
+let H =
+    window.innerHeight;
+
+canvas.width = W;
+canvas.height = H;
+
+
+/* =========================================================
+   PHYSIQUE
+========================================================= */
+
+/*
+    NOUVELLE PHYSIQUE
+
+    Vitesse très élevée :
+    14 pixels / frame
+
+    Saut beaucoup plus bas :
+    -18
+
+    Gravité forte :
+    1.05
+
+    Hauteur maximale :
+
+        18² / (2 × 1.05)
+        ≈ 154 pixels
+
+    Donc les plateformes sont maintenant
+    volontairement beaucoup plus basses.
+*/
+
+const SPEED = 14;
+
+const GRAVITY = 1.05;
+
+const JUMP_FORCE = -18;
+
+const PLAYER_SIZE = 42;
+
+const GROUND_HEIGHT = 100;
+
+
+/* =========================================================
+   GROUND
+========================================================= */
+
+let GROUND_Y =
+    Math.floor(H * .78);
+
+if(GROUND_Y > H - 70){
+    GROUND_Y = H - 70;
+}
+
+
+/* =========================================================
+   GAME STATE
+========================================================= */
+
+let running = false;
+
+let mode = "easy";
+
+let cameraX = 0;
+
+let levelLength = 30000;
+
+let surfaces = [];
+
+let spikes = [];
+
+let coins = [];
+
+let particles = [];
+
+
+/* =========================================================
+   PLAYER
+========================================================= */
+
+const player = {
+
+    x:180,
+
+    y:0,
+
+    vy:0,
+
+    size:PLAYER_SIZE,
+
+    grounded:false,
+
+    rotation:0
+
+};
+
+
+/* =========================================================
+   BACKGROUND
+========================================================= */
+
+/*
+    Beaucoup moins d'objets que précédemment.
+    Ça réduit le travail du navigateur.
+*/
+
+const stars = [];
+
+for(let i=0;i<80;i++){
+
+    stars.push({
+
+        x:Math.random()*5000,
+
+        y:Math.random()*H,
+
+        size:Math.random()*1.5+.5,
+
+        speed:Math.random()*.5+.15
+
+    });
+
+}
+
+
+/* =========================================================
+   LEVEL HELPERS
+========================================================= */
+
+function clearLevel(){
+
+    surfaces.length = 0;
+
+    spikes.length = 0;
+
+    coins.length = 0;
+
+}
+
+
+function addGround(x,width){
+
+    surfaces.push({
+
+        x:x,
+
+        y:GROUND_Y,
+
+        width:width,
+
+        height:GROUND_HEIGHT
+
+    });
+
+}
+
+
+function addPlatform(x,y,width){
+
+    surfaces.push({
+
+        x:x,
+
+        y:y,
+
+        width:width,
+
+        height:24
+
+    });
+
+}
+
+
+function addSpike(x,y,count=1){
+
+    for(let i=0;i<count;i++){
+
+        spikes.push({
+
+            x:x+i*38,
+
+            y:y,
+
+            width:38,
+
+            height:38
+
+        });
+
+    }
+
+}
+
+
+function addCoin(x,y){
+
+    coins.push({
+
+        x:x,
+
+        y:y,
+
+        collected:false,
+
+        phase:Math.random()*6
+
+    });
+
+}
+
+
+/* =========================================================
+   EASY
+========================================================= */
+
+function buildEasy(){
+
+    clearLevel();
+
+    levelLength = 26000;
+
+
+    /*
+        PHASE 1
+        Grande zone de départ
+    */
+
+    addGround(0,1700);
+
+
+    /*
+        SPIKES
+
+        1 saut suffit.
+    */
+
+    addSpike(1050,GROUND_Y);
+
+    addSpike(1220,GROUND_Y);
+
+
+    addCoin(
+        1400,
+        GROUND_Y-95
+    );
+
+
+    /*
+        PETIT TROU
+
+        Largeur raisonnable.
+    */
+
+    addGround(1700,280);
+
+    addGround(2220,1400);
+
+
+    /*
+        PLATEFORME BASSE
+
+        Seulement 85px au-dessus.
+    */
+
+    addPlatform(
+        2600,
+        GROUND_Y-85,
+        400
+    );
+
+
+    addCoin(
+        2800,
+        GROUND_Y-135
+    );
+
+
+    addGround(3620,1500);
+
+
+    addSpike(
+        4100,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(5120,1600);
+
+
+    /*
+        TROU
+    */
+
+    addGround(5600,350);
+
+    addGround(5950,1400);
+
+
+    addPlatform(
+        6400,
+        GROUND_Y-90,
+        420
+    );
+
+
+    addGround(7100,1700);
+
+
+    addSpike(
+        7600,
+        GROUND_Y
+    );
+
+    addSpike(
+        7780,
+        GROUND_Y
+    );
+
+
+    addCoin(
+        8200,
+        GROUND_Y-100
+    );
+
+
+    addGround(8800,1700);
+
+
+    addPlatform(
+        9300,
+        GROUND_Y-90,
+        450
+    );
+
+
+    addGround(10100,1700);
+
+
+    addSpike(
+        10700,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(11300,1600);
+
+
+    addPlatform(
+        11800,
+        GROUND_Y-90,
+        450
+    );
+
+
+    addGround(12500,1800);
+
+
+    addSpike(
+        13100,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(13700,1800);
+
+
+    addPlatform(
+        14300,
+        GROUND_Y-90,
+        450
+    );
+
+
+    addGround(15000,1700);
+
+
+    addSpike(
+        15600,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(16200,1900);
+
+
+    addPlatform(
+        16800,
+        GROUND_Y-90,
+        450
+    );
+
+
+    addGround(17500,1800);
+
+
+    addSpike(
+        18100,
+        GROUND_Y
+    );
+
+
+    addSpike(
+        18300,
+        GROUND_Y
+    );
+
+
+    addGround(18900,1900);
+
+
+    addPlatform(
+        19500,
+        GROUND_Y-90,
+        450
+    );
+
+
+    addGround(20200,1800);
+
+
+    addSpike(
+        20800,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(21400,1900);
+
+
+    addPlatform(
+        22000,
+        GROUND_Y-90,
+        450
+    );
+
+
+    addGround(22700,1800);
+
+
+    addSpike(
+        23300,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(23900,2600);
+
+}
+
+
+/* =========================================================
+   NORMAL
+========================================================= */
+
+function buildNormal(){
+
+    clearLevel();
+
+    levelLength = 28000;
+
+
+    addGround(0,1500);
+
+
+    addSpike(
+        850,
+        GROUND_Y
+    );
+
+    addSpike(
+        1030,
+        GROUND_Y
+    );
+
+    addSpike(
+        1210,
+        GROUND_Y
+    );
+
+
+    addGround(1500,300);
+
+    addGround(2050,1200);
+
+
+    addPlatform(
+        2500,
+        GROUND_Y-100,
+        350
+    );
+
+
+    addGround(3250,1300);
+
+
+    addSpike(
+        3700,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(4300,1400);
+
+
+    addPlatform(
+        4750,
+        GROUND_Y-100,
+        350
+    );
+
+
+    addPlatform(
+        5200,
+        GROUND_Y-100,
+        350
+    );
+
+
+    addGround(5800,1500);
+
+
+    addSpike(
+        6300,
+        GROUND_Y,
+        2
+    );
+
+
+    addGround(6900,1500);
+
+
+    addPlatform(
+        7400,
+        GROUND_Y-105,
+        380
+    );
+
+
+    addGround(8100,1600);
+
+
+    addSpike(
+        8600,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(9200,1500);
+
+
+    addPlatform(
+        9700,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addPlatform(
+        10200,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(10750,1500);
+
+
+    addSpike(
+        11300,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(11900,1600);
+
+
+    addPlatform(
+        12400,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(13100,1600);
+
+
+    addSpike(
+        13600,
+        GROUND_Y,
+        2
+    );
+
+
+    addSpike(
+        13950,
+        GROUND_Y
+    );
+
+
+    addGround(14500,1600);
+
+
+    addPlatform(
+        15000,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addPlatform(
+        15500,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(16100,1600);
+
+
+    addSpike(
+        16600,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(17200,1600);
+
+
+    addPlatform(
+        17700,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(18400,1600);
+
+
+    addSpike(
+        18900,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(19500,1600);
+
+
+    addPlatform(
+        20000,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addPlatform(
+        20500,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(21100,1600);
+
+
+    addSpike(
+        21600,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(22200,1600);
+
+
+    addPlatform(
+        22700,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(23400,1600);
+
+
+    addSpike(
+        23900,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(24500,1600);
+
+
+    addPlatform(
+        25000,
+        GROUND_Y-105,
+        400
+    );
+
+
+    addGround(25700,3000);
+
+}
+
+
+/* =========================================================
+   HARD
+========================================================= */
+
+function buildHard(){
+
+    clearLevel();
+
+    levelLength = 30000;
+
+
+    addGround(0,1400);
+
+
+    addSpike(
+        750,
+        GROUND_Y,
+        2
+    );
+
+
+    addSpike(
+        1100,
+        GROUND_Y
+    );
+
+
+    addGround(1400,300);
+
+    addGround(1950,1100);
+
+
+    addPlatform(
+        2350,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addPlatform(
+        2800,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(3400,1200);
+
+
+    addSpike(
+        3800,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(4400,1300);
+
+
+    addPlatform(
+        4850,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addPlatform(
+        5300,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(5900,1300);
+
+
+    addSpike(
+        6300,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(6900,1300);
+
+
+    addPlatform(
+        7350,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(8000,1300);
+
+
+    addSpike(
+        8400,
+        GROUND_Y,
+        3
+    );
+
+
+    addSpike(
+        8800,
+        GROUND_Y
+    );
+
+
+    addGround(9300,1300);
+
+
+    addPlatform(
+        9750,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addPlatform(
+        10200,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(10800,1300);
+
+
+    addSpike(
+        11200,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(11800,1300);
+
+
+    addPlatform(
+        12250,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(12900,1300);
+
+
+    addSpike(
+        13300,
+        GROUND_Y,
+        3
+    );
+
+
+    addSpike(
+        13700,
+        GROUND_Y
+    );
+
+
+    addGround(14200,1300);
+
+
+    addPlatform(
+        14650,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addPlatform(
+        15100,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(15700,1300);
+
+
+    addSpike(
+        16100,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(16700,1300);
+
+
+    addPlatform(
+        17150,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(17800,1300);
+
+
+    addSpike(
+        18200,
+        GROUND_Y,
+        3
+    );
+
+
+    addSpike(
+        18600,
+        GROUND_Y
+    );
+
+
+    addGround(19100,1300);
+
+
+    addPlatform(
+        19550,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addPlatform(
+        20000,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(20600,1300);
+
+
+    addSpike(
+        21000,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(21600,1300);
+
+
+    addPlatform(
+        22050,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(22700,1300);
+
+
+    addSpike(
+        23100,
+        GROUND_Y,
+        3
+    );
+
+
+    addSpike(
+        23500,
+        GROUND_Y
+    );
+
+
+    addGround(24000,1300);
+
+
+    addPlatform(
+        24450,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addPlatform(
+        24900,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(25500,1300);
+
+
+    addSpike(
+        25900,
+        GROUND_Y,
+        3
+    );
+
+
+    addGround(26500,1300);
+
+
+    addPlatform(
+        26950,
+        GROUND_Y-110,
+        350
+    );
+
+
+    addGround(27600,2400);
+
+}
+
+
+/* =========================================================
+   BUILD
+========================================================= */
+
+function buildLevel(){
+
+    if(mode === "easy"){
+        buildEasy();
+    }
+
+    else if(mode === "normal"){
+        buildNormal();
+    }
+
+    else{
+        buildHard();
+    }
+
+}
+
+
+/* =========================================================
+   SPAWN
+========================================================= */
+
+function spawnPlayer(){
+
+    const first =
+        surfaces[0];
+
+    player.x = 180;
+
+    player.y =
+        first.y -
+        player.size;
+
+    player.vy = 0;
+
+    player.grounded = true;
+
+    player.rotation = 0;
+
+}
+
+
+/* =========================================================
+   START
+========================================================= */
+
+function startGame(selectedMode){
+
+    mode = selectedMode;
+
+    menu.style.display = "none";
+
+    gameOver.style.display = "none";
+
+    win.style.display = "none";
+
+    hud.style.display = "block";
+
+    musicButton.style.display = "block";
+
+    cameraX = 0;
+
+    particles.length = 0;
+
+    buildLevel();
+
+    spawnPlayer();
+
+    running = true;
+
+    startMusic();
+
+    lastTime =
+        performance.now();
+
+    accumulator = 0;
+
+    requestAnimationFrame(
+        gameLoop
+    );
+
+}
+
+
+/* =========================================================
+   INPUT
+========================================================= */
+
+function jump(){
+
+    if(!running) return;
+
+    if(!player.grounded) return;
+
+    player.vy =
+        JUMP_FORCE;
+
+    player.grounded = false;
+
+    playJumpSound();
+
+}
+
+
+window.addEventListener(
+    "keydown",
+    e => {
+
+        if(e.code === "Space"){
+
+            e.preventDefault();
+
+            jump();
+
+        }
+
+    }
+);
+
+
+canvas.addEventListener(
+    "pointerdown",
+    jump
+);
+
+
+/* =========================================================
+   FIXED TIMESTEP
+========================================================= */
+
+const FIXED_DT =
+    1/60;
+
+let accumulator = 0;
+
+let lastTime =
+    performance.now();
+
+
+/* =========================================================
+   PLAYER UPDATE
+========================================================= */
+
+function updatePlayer(){
+
+    const previousBottom =
+        player.y +
+        player.size;
+
+
+    player.vy +=
+        GRAVITY;
+
+
+    player.y +=
+        player.vy;
+
+
+    const currentBottom =
+        player.y +
+        player.size;
+
+
+    const worldX =
+        cameraX +
+        player.x;
+
+
+    player.grounded = false;
+
+
+    /*
+        COLLISION SOL / PLATEFORME
+    */
+
+    for(
+        let i=0;
+        i<surfaces.length;
+        i++
+    ){
+
+        const s =
+            surfaces[i];
+
+
+        /*
+            Optimisation :
+            ignorer les objets très loin.
+        */
+
+        if(
+            s.x + s.width <
+            worldX - 100
+        ){
+            continue;
+        }
+
+
+        if(
+            s.x >
+            worldX + player.size + 100
+        ){
+            continue;
+        }
+
+
+        const horizontal =
+            worldX +
+            player.size -
+            5 >
+            s.x
+            &&
+            worldX + 5 <
+            s.x +
+            s.width;
+
+
+        if(!horizontal){
+            continue;
+        }
+
+
+        const landing =
+            previousBottom <= s.y
+            &&
+            currentBottom >= s.y
+            &&
+            player.vy >= 0;
+
+
+        if(landing){
+
+            player.y =
+                s.y -
+                player.size;
+
+            player.vy = 0;
+
+            player.grounded = true;
+
+            break;
+
+        }
+
+    }
+
+
+    /*
+        TROU
+    */
+
+    if(
+        player.y >
+        H + 120
+    ){
+
+        killPlayer();
+
+        return;
+
+    }
+
+
+    /*
+        ROTATION
+    */
+
+    if(
+        !player.grounded
+    ){
+
+        player.rotation += .18;
+
+    }
+
+}
+
+
+/* =========================================================
+   SPIKE COLLISION
+========================================================= */
+
+function checkSpikes(){
+
+    const worldX =
+        cameraX +
+        player.x;
+
+
+    const left =
+        worldX + 10;
+
+    const right =
+        worldX +
+        player.size -
+        10;
+
+    const top =
+        player.y + 9;
+
+    const bottom =
+        player.y +
+        player.size -
+        5;
+
+
+    for(
+        let i=0;
+        i<spikes.length;
+        i++
+    ){
+
+        const s =
+            spikes[i];
+
+
+        /*
+            Optimisation
+        */
+
+        if(
+            s.x + s.width <
+            worldX - 50
+        ){
+            continue;
+        }
+
+
+        if(
+            s.x >
+            worldX + 100
+        ){
+            break;
+        }
+
+
+        const spikeLeft =
+            s.x + 7;
+
+        const spikeRight =
+            s.x +
+            s.width - 7;
+
+        const spikeTop =
+            s.y -
+            s.height;
+
+
+        if(
+            right > spikeLeft
+            &&
+            left < spikeRight
+            &&
+            bottom > spikeTop
+            &&
+            top < s.y
+        ){
+
+            killPlayer();
+
+            return;
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   COINS
+========================================================= */
+
+function checkCoins(){
+
+    const px =
+        cameraX +
+        player.x +
+        player.size/2;
+
+    const py =
+        player.y +
+        player.size/2;
+
+
+    for(
+        let i=0;
+        i<coins.length;
+        i++
+    ){
+
+        const c =
+            coins[i];
+
+
+        if(c.collected){
+            continue;
+        }
+
+
+        if(
+            Math.abs(c.x-px) > 50
+        ){
+            continue;
+        }
+
+
+        const dx =
+            px-c.x;
+
+        const dy =
+            py-c.y;
+
+
+        if(
+            Math.sqrt(
+                dx*dx +
+                dy*dy
+            ) < 38
+        ){
+
+            c.collected = true;
+
+            createParticles(
+                c.x-cameraX,
+                c.y,
+                8
+            );
+
+            playCoinSound();
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   CAMERA
+========================================================= */
+
+function updateCamera(){
+
+    cameraX +=
+        SPEED;
+
+}
+
+
+/* =========================================================
+   PARTICLES
+========================================================= */
+
+function createParticles(
+    x,
+    y,
+    amount
+){
+
+    for(
+        let i=0;
+        i<amount;
+        i++
+    ){
+
+        particles.push({
+
+            x:x,
+
+            y:y,
+
+            vx:
+                (Math.random()-.5)*6,
+
+            vy:
+                (Math.random()-.5)*6,
+
+            life:25
+
+        });
+
+    }
+
+}
+
+
+function updateParticles(){
+
+    for(
+        let i=particles.length-1;
+        i>=0;
+        i--
+    ){
+
+        const p =
+            particles[i];
+
+
+        p.x += p.vx;
+
+        p.y += p.vy;
+
+        p.vy += .12;
+
+        p.life--;
+
+
+        if(p.life <= 0){
+
+            particles.splice(
+                i,
+                1
+            );
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   UPDATE
+========================================================= */
+
+function updateFixed(){
+
+    if(!running){
+        return;
+    }
+
+
+    updateCamera();
+
+    updatePlayer();
+
+
+    if(!running){
+        return;
+    }
+
+
+    checkSpikes();
+
+
+    if(!running){
+        return;
+    }
+
+
+    checkCoins();
+
+    updateParticles();
+
+
+    const progress =
+        Math.min(
+            100,
+            Math.floor(
+                cameraX /
+                (levelLength-W)
+                * 100
+            )
+        );
+
+
+    document.getElementById(
+        "progress"
+    ).style.width =
+        progress+"%";
+
+
+    document.getElementById(
+        "score"
+    ).textContent =
+        progress+"%";
+
+
+    if(
+        cameraX +
+        player.x >=
+        levelLength
+    ){
+
+        winGame();
+
+    }
+
+}
+
+
+/* =========================================================
+   GAME LOOP
+========================================================= */
+
+function gameLoop(now){
+
+    if(!running){
+        return;
+    }
+
+
+    let delta =
+        (now-lastTime)/1000;
+
+
+    lastTime = now;
+
+
+    /*
+        Empêche un gros freeze
+        de casser la physique.
+    */
+
+    if(delta > .05){
+        delta = .05;
+    }
+
+
+    accumulator +=
+        delta;
+
+
+    while(
+        accumulator >=
+        FIXED_DT
+    ){
+
+        updateFixed();
+
+        accumulator -=
+            FIXED_DT;
+
+
+        if(!running){
+            break;
+        }
+
+    }
+
+
+    draw();
+
+
+    if(running){
+
+        requestAnimationFrame(
+            gameLoop
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   DEATH
+========================================================= */
+
+function killPlayer(){
+
+    if(!running){
+        return;
+    }
+
+
+    running = false;
+
+
+    createParticles(
+        player.x+21,
+        player.y+21,
+        25
+    );
+
+
+    playDeathSound();
+
+    stopMusic();
+
+
+    hud.style.display =
+        "none";
+
+
+    setTimeout(
+        () => {
+
+            gameOver.style.display =
+                "flex";
+
+        },
+        180
+    );
+
+}
+
+
+/* =========================================================
+   WIN
+========================================================= */
+
+function winGame(){
+
+    if(!running){
+        return;
+    }
+
+
+    running = false;
+
+    stopMusic();
+
+    playWinSound();
+
+
+    hud.style.display =
+        "none";
+
+
+    setTimeout(
+        () => {
+
+            win.style.display =
+                "flex";
+
+        },
+        180
+    );
+
+}
+
+
+/* =========================================================
+   BACKGROUND
+========================================================= */
+
+function drawBackground(){
+
+    let hue = 190;
+
+
+    if(mode === "normal"){
+        hue = 250;
+    }
+
+
+    if(mode === "hard"){
+        hue = 320;
+    }
+
+
+    /*
+        Fond simple.
+        Beaucoup moins lourd.
+    */
+
+    ctx.fillStyle =
+        `hsl(${hue},65%,6%)`;
+
+
+    ctx.fillRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /*
+        GLOW CENTRAL
+    */
+
+    const gradient =
+        ctx.createRadialGradient(
+            W*.5,
+            H*.35,
+            0,
+            W*.5,
+            H*.35,
+            W*.7
+        );
+
+
+    gradient.addColorStop(
+        0,
+        `hsla(${hue},100%,40%,.12)`
+    );
+
+
+    gradient.addColorStop(
+        1,
+        "transparent"
+    );
+
+
+    ctx.fillStyle =
+        gradient;
+
+
+    ctx.fillRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /*
+        STARS
+    */
+
+    for(
+        let i=0;
+        i<stars.length;
+        i++
+    ){
+
+        const s =
+            stars[i];
+
+
+        let x =
+            (
+                s.x -
+                cameraX*s.speed
+            ) %
+            (W+100);
+
+
+        if(x<0){
+            x += W+100;
+        }
+
+
+        ctx.fillStyle =
+            "rgba(255,255,255,.45)";
+
+
+        ctx.fillRect(
+            x,
+            s.y,
+            s.size,
+            s.size
+        );
+
+    }
+
+
+    /*
+        GRID
+    */
+
+    const grid = 100;
+
+    const offset =
+        -(cameraX*.35)%grid;
+
+
+    ctx.strokeStyle =
+        `hsla(${hue},100%,70%,.055)`;
+
+
+    ctx.lineWidth = 1;
+
+
+    for(
+        let x=offset;
+        x<W;
+        x+=grid
+    ){
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x,
+            0
+        );
+
+        ctx.lineTo(
+            x,
+            H
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    for(
+        let y=0;
+        y<H;
+        y+=grid
+    ){
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            0,
+            y
+        );
+
+        ctx.lineTo(
+            W,
+            y
+        );
+
+        ctx.stroke();
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW SURFACES
+========================================================= */
+
+function drawSurfaces(){
+
+    /*
+        On ne dessine que ce qui
+        est proche de l'écran.
+    */
+
+    const minX =
+        cameraX - 100;
+
+    const maxX =
+        cameraX + W + 100;
+
+
+    for(
+        let i=0;
+        i<surfaces.length;
+        i++
+    ){
+
+        const s =
+            surfaces[i];
+
+
+        if(
+            s.x+s.width < minX
+            ||
+            s.x > maxX
+        ){
+
+            continue;
+
+        }
+
+
+        const x =
+            s.x-cameraX;
+
+
+        ctx.fillStyle =
+            "#07152c";
+
+
+        ctx.fillRect(
+            x,
+            s.y,
+            s.width,
+            s.height
+        );
+
+
+        /*
+            LIGNE NÉON
+        */
+
+        ctx.fillStyle =
+            "#00eaff";
+
+
+        ctx.fillRect(
+            x,
+            s.y,
+            s.width,
+            4
+        );
+
+
+        /*
+            petites lignes
+        */
+
+        ctx.fillStyle =
+            "rgba(255,255,255,.06)";
+
+
+        const start =
+            Math.max(
+                0,
+                Math.floor(
+                    (cameraX-s.x)/50
+                )
+            );
+
+
+        for(
+            let j=start;
+            j<
+            Math.ceil(
+                (W+100)/50
+            );
+            j++
+        ){
+
+            const px =
+                x+j*50;
+
+
+            if(
+                px > x+s.width
+            ){
+                break;
+            }
+
+
+            ctx.fillRect(
+                px,
+                s.y+12,
+                1,
+                s.height-12
+            );
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW SPIKES
+========================================================= */
+
+function drawSpikes(){
+
+    const minX =
+        cameraX-100;
+
+    const maxX =
+        cameraX+W+100;
+
+
+    for(
+        let i=0;
+        i<spikes.length;
+        i++
+    ){
+
+        const s =
+            spikes[i];
+
+
+        if(
+            s.x+s.width < minX
+            ||
+            s.x > maxX
+        ){
+
+            continue;
+
+        }
+
+
+        const x =
+            s.x-cameraX;
+
+
+        ctx.fillStyle =
+            "#ff2997";
+
+
+        ctx.beginPath();
+
+
+        ctx.moveTo(
+            x,
+            s.y
+        );
+
+
+        ctx.lineTo(
+            x+s.width/2,
+            s.y-s.height
+        );
+
+
+        ctx.lineTo(
+            x+s.width,
+            s.y
+        );
+
+
+        ctx.closePath();
+
+
+        ctx.fill();
+
+
+        ctx.fillStyle =
+            "white";
+
+
+        ctx.fillRect(
+            x+s.width/2-1,
+            s.y-s.height+5,
+            2,
+            8
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW COINS
+========================================================= */
+
+function drawCoins(){
+
+    for(
+        let i=0;
+        i<coins.length;
+        i++
+    ){
+
+        const c =
+            coins[i];
+
+
+        if(c.collected){
+            continue;
+        }
+
+
+        const x =
+            c.x-cameraX;
+
+
+        if(
+            x < -30 ||
+            x > W+30
+        ){
+            continue;
+        }
+
+
+        c.phase += .08;
+
+
+        const r =
+            12 +
+            Math.sin(c.phase)*2;
+
+
+        ctx.strokeStyle =
+            "#ffe600";
+
+
+        ctx.lineWidth = 4;
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            x,
+            c.y,
+            r,
+            0,
+            Math.PI*2
+        );
+
+
+        ctx.stroke();
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW PLAYER
+========================================================= */
+
+function drawPlayer(){
+
+    /*
+        Cube simple et léger.
+    */
+
+    ctx.save();
+
+
+    ctx.translate(
+        player.x+21,
+        player.y+21
+    );
+
+
+    ctx.rotate(
+        player.rotation
+    );
+
+
+    ctx.fillStyle =
+        "#00eaff";
+
+
+    ctx.fillRect(
+        -21,
+        -21,
+        42,
+        42
+    );
+
+
+    ctx.fillStyle =
+        "#8b00ff";
+
+
+    ctx.fillRect(
+        -15,
+        -15,
+        30,
+        30
+    );
+
+
+    ctx.strokeStyle =
+        "white";
+
+
+    ctx.lineWidth = 2;
+
+
+    ctx.strokeRect(
+        -15,
+        -15,
+        30,
+        30
+    );
+
+
+    ctx.fillStyle =
+        "white";
+
+
+    ctx.fillRect(
+        -4,
+        -4,
+        8,
+        8
+    );
+
+
+    ctx.restore();
+
+}
+
+
+/* =========================================================
+   DRAW PARTICLES
+========================================================= */
+
+function drawParticles(){
+
+    for(
+        let i=0;
+        i<particles.length;
+        i++
+    ){
+
+        const p =
+            particles[i];
+
+
+        ctx.globalAlpha =
+            p.life/25;
+
+
+        ctx.fillStyle =
+            "#00eaff";
+
+
+        ctx.fillRect(
+            p.x,
+            p.y,
+            4,
+            4
+        );
+
+    }
+
+
+    ctx.globalAlpha = 1;
+
+}
+
+
+/* =========================================================
+   DRAW
+========================================================= */
+
+function draw(){
+
+    drawBackground();
+
+    drawSurfaces();
+
+    drawSpikes();
+
+    drawCoins();
+
+    drawParticles();
+
+
+    if(running){
+
+        drawPlayer();
+
+    }
+
+}
+
+
+/* =========================================================
+   AUDIO
+========================================================= */
+
+let audioContext = null;
+
+let masterGain = null;
+
+let musicTimer = null;
+
+let musicPlaying = false;
+
+let musicStep = 0;
+
+
+function initAudio(){
+
+    if(audioContext){
+        return;
+    }
+
+
+    audioContext =
+        new (
+            window.AudioContext ||
+            window.webkitAudioContext
+        )();
+
+
+    masterGain =
+        audioContext.createGain();
+
+
+    masterGain.gain.value =
+        .15;
+
+
+    masterGain.connect(
+        audioContext.destination
+    );
+
+}
+
+
+function playTone(
+    frequency,
+    duration,
+    type,
+    volume
+){
+
+    if(!audioContext){
+        return;
+    }
+
+
+    const osc =
+        audioContext.createOscillator();
+
+
+    const gain =
+        audioContext.createGain();
+
+
+    osc.type =
+        type;
+
+
+    osc.frequency.value =
+        frequency;
+
+
+    gain.gain.setValueAtTime(
+        volume,
+        audioContext.currentTime
+    );
+
+
+    gain.gain.exponentialRampToValueAtTime(
+        .001,
+        audioContext.currentTime+
+        duration
+    );
+
+
+    osc.connect(gain);
+
+    gain.connect(
+        masterGain
+    );
+
+
+    osc.start();
+
+
+    osc.stop(
+        audioContext.currentTime+
+        duration
+    );
+
+}
+
+
+function playJumpSound(){
+
+    initAudio();
+
+
+    playTone(
+        500,
+        .08,
+        "square",
+        .08
+    );
+
+}
+
+
+function playCoinSound(){
+
+    initAudio();
+
+
+    playTone(
+        900,
+        .08,
+        "square",
+        .08
+    );
+
+
+    setTimeout(
+        () => {
+
+            playTone(
+                1300,
+                .1,
+                "square",
+                .06
+            );
+
+        },
+        50
+    );
+
+}
+
+
+function playDeathSound(){
+
+    initAudio();
+
+
+    playTone(
+        170,
+        .25,
+        "sawtooth",
+        .12
+    );
+
+
+    setTimeout(
+        () => {
+
+            playTone(
+                70,
+                .3,
+                "sawtooth",
+                .08
+            );
+
+        },
+        80
+    );
+
+}
+
+
+function playWinSound(){
+
+    initAudio();
+
+
+    const notes=[
+        523,
+        659,
+        784,
+        1046
+    ];
+
+
+    notes.forEach(
+        (n,i)=>{
+
+            setTimeout(
+                () => {
+
+                    playTone(
+                        n,
+                        .2,
+                        "square",
+                        .08
+                    );
+
+                },
+                i*120
+            );
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   MUSIC
+========================================================= */
+
+function startMusic(){
+
+    initAudio();
+
+
+    if(
+        audioContext.state ===
+        "suspended"
+    ){
+
+        audioContext.resume();
+
+    }
+
+
+    stopMusic();
+
+
+    musicPlaying = true;
+
+    musicStep = 0;
+
+    musicTick();
+
+}
+
+
+function stopMusic(){
+
+    musicPlaying = false;
+
+
+    if(musicTimer){
+
+        clearTimeout(
+            musicTimer
+        );
+
+        musicTimer = null;
+
+    }
+
+}
+
+
+function musicTick(){
+
+    if(!musicPlaying){
+        return;
+    }
+
+
+    let bpm = 130;
+
+
+    if(mode === "normal"){
+        bpm = 160;
+    }
+
+
+    if(mode === "hard"){
+        bpm = 185;
+    }
+
+
+    const beat =
+        60000/bpm;
+
+
+    const melodies = {
+
+        easy:[
+            261,
+            329,
+            392,
+            329,
+            293,
+            349,
+            440,
+            349
+        ],
+
+        normal:[
+            220,
+            277,
+            330,
+            415,
+            330,
+            277,
+            247,
+            330
+        ],
+
+        hard:[
+            110,
+            165,
+            220,
+            165,
+            123,
+            185,
+            247,
+            185
+        ]
+
+    };
+
+
+    const melody =
+        melodies[mode];
+
+
+    const note =
+        melody[
+            musicStep%
+            melody.length
+        ];
+
+
+    playTone(
+        note,
+        beat/1000*.65,
+        "sawtooth",
+        .03
+    );
+
+
+    if(
+        musicStep%2===0
+    ){
+
+        playTone(
+            note/2,
+            beat/1000*.5,
+            "square",
+            .045
+        );
+
+    }
+
+
+    playTone(
+        60,
+        .055,
+        "sine",
+        mode==="hard"
+            ? .11
+            : .065
+    );
+
+
+    musicStep++;
+
+
+    musicTimer =
+        setTimeout(
+            musicTick,
+            beat
+        );
+
+}
+
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+easyBtn.onclick =
+    () => startGame("easy");
+
+
+normalBtn.onclick =
+    () => startGame("normal");
+
+
+hardBtn.onclick =
+    () => startGame("hard");
+
+
+retryBtn.onclick =
+    () => startGame(mode);
+
+
+retryBtn2.onclick =
+    () => startGame(mode);
+
+
+function returnMenu(){
+
+    running = false;
+
+    stopMusic();
+
+
+    gameOver.style.display =
+        "none";
+
+
+    win.style.display =
+        "none";
+
+
+    hud.style.display =
+        "none";
+
+
+    musicButton.style.display =
+        "none";
+
+
+    menu.style.display =
+        "flex";
+
+
+    cameraX = 0;
+
+
+    buildLevel();
+
+    spawnPlayer();
+
+    draw();
+
+}
+
+
+menuBtn1.onclick =
+    returnMenu;
+
+
+menuBtn2.onclick =
+    returnMenu;
+
+
+musicButton.onclick = () => {
+
+    if(musicPlaying){
+
+        stopMusic();
+
+        musicButton.textContent =
+            "🔇 MUSIQUE";
+
+    }
+
+    else{
+
+        startMusic();
+
+        musicButton.textContent =
+            "🔊 MUSIQUE";
+
+    }
+
+};
+
+
+/* =========================================================
+   INITIAL
+========================================================= */
+
+buildEasy();
+
+spawnPlayer();
+
+draw();
+
+</script>
+
+</body>
+</html>
